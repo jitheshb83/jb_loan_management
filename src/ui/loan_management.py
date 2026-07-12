@@ -9,8 +9,21 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QDate, Signal
 from PySide6.QtGui import QFont
 from src.calculations import EMICalculator
+from src.database import get_session, LoanRepository
 from src.utils.helpers import to_datetime, format_currency
 from src.utils.validators import validate_loan_input, ValidationError
+
+# Keys copied between the Loan ORM model and the loan dicts the UI passes
+# around via signals
+_LOAN_FIELDS = ("name", "bank_name", "principal_amount", "annual_rate",
+                "tenure_months", "start_date", "emi")
+
+
+def _loan_to_dict(loan) -> dict:
+    """Convert a Loan ORM object to the dict shape the UI modules consume."""
+    data = {field: getattr(loan, field) for field in _LOAN_FIELDS}
+    data["id"] = loan.id
+    return data
 
 
 class LoanForm(QDialog):
@@ -183,10 +196,18 @@ class LoanManagement(QWidget):
 
     loan_selected = Signal(dict)
 
-    def __init__(self):
+    def __init__(self, session=None):
         super().__init__()
+        self.session = session or get_session()
+        self.repo = LoanRepository(self.session)
         self.loans = []
         self._init_ui()
+        self._load_loans()
+
+    def _load_loans(self):
+        """Load persisted loans from the database on startup."""
+        self.loans = [_loan_to_dict(loan) for loan in self.repo.get_active_loans()]
+        self._refresh_table()
 
     def _init_ui(self):
         """Initialize UI."""
@@ -290,20 +311,28 @@ class LoanManagement(QWidget):
 
         if reply == QMessageBox.StandardButton.Yes:
             row = selected_rows[0].row()
-            self.loans.pop(row)
+            loan = self.loans.pop(row)
             self.loans_table.removeRow(row)
+            # Cascades to the loan's payments/extra payments/simulations
+            if loan.get("id") is not None:
+                self.repo.delete(loan["id"])
 
     def _on_loan_saved(self, loan_data):
-        """Handle a newly added loan."""
+        """Persist and display a newly added loan."""
+        record = self.repo.create(**{k: loan_data[k] for k in _LOAN_FIELDS})
+        loan_data["id"] = record.id
         self.loans.append(loan_data)
         self._refresh_table()
 
     def _on_loan_edited(self, row: int, loan_data):
-        """Replace an existing loan after editing."""
+        """Persist and replace an existing loan after editing."""
         if 0 <= row < len(self.loans):
+            loan_data["id"] = self.loans[row].get("id")
             self.loans[row] = loan_data
         else:
             self.loans.append(loan_data)
+        if loan_data.get("id") is not None:
+            self.repo.update(loan_data["id"], **{k: loan_data[k] for k in _LOAN_FIELDS})
         self._refresh_table()
         # Re-emit so dashboard and other tabs refresh with the edited values
         self.loan_selected.emit(loan_data)
@@ -350,9 +379,8 @@ class LoanManagement(QWidget):
             self.loans_table.setItem(row_pos, 6, QTableWidgetItem("Active"))
 
     def add_loan(self, loan_data: dict):
-        """Programmatically add a loan."""
-        self.loans.append(loan_data)
-        self._refresh_table()
+        """Programmatically add a loan (persisted like a form save)."""
+        self._on_loan_saved(loan_data)
 
     def get_loans(self) -> list:
         """Get all loans."""

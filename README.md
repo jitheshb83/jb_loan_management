@@ -138,9 +138,14 @@ If no certificate is installed, the script explains what's needed and exits clea
 - **`pyinstaller: command not found`** — activate your virtualenv, or `pip install pyinstaller`.
 - **Blank/odd fonts in charts** — harmless Qt font-alias warning on first launch; it resolves itself.
 
+## Data Persistence
+
+Loans and extra-payment plans are stored in a local SQLite database (`~/.loan_manager/loans.db`) and reload automatically on launch — the first saved loan is selected and the dashboard populates immediately. Deleting a loan also removes its associated payment plans.
+
+Set `LOAN_MANAGER_DATA_DIR=/some/path` to relocate the database (useful for testing or portable installs).
+
 ## Known Limitations (MVP)
 
-- Loans are held in memory during a session — SQLite persistence is scaffolded but not yet wired into the UI (planned next)
 - PDF report generation not yet implemented
 - Single-loan workflows; multi-loan portfolio view planned
 
