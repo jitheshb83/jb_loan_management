@@ -6,6 +6,7 @@ setup(
     description="Desktop application for housing loan management, amortization analysis, and prepayment optimization",
     author="Jithesh Bharathan",
     author_email="jithesh@jithonline.com",
+    license="MIT",
     packages=find_packages(),
     python_requires=">=3.10",
     install_requires=[
