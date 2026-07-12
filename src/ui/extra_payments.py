@@ -10,6 +10,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import QDate, Signal
 from PySide6.QtGui import QFont
 from src.calculations.extra_payment_engine import ExtraPaymentEngine
+from src.database import get_session, ExtraPaymentRepository
+from src.models.extra_payment import PaymentFrequency
 from src.ui.widgets import StatCard
 from src.utils.helpers import to_datetime, format_currency, format_date
 from src.utils.validators import validate_amount
@@ -21,14 +23,25 @@ FREQUENCY_INTERVALS = {
     "Yearly": 12,
 }
 
+# UI display label <-> persisted PaymentFrequency enum
+_UI_TO_ENUM = {
+    "One-Time": PaymentFrequency.ONE_TIME,
+    "Monthly": PaymentFrequency.MONTHLY,
+    "Quarterly": PaymentFrequency.QUARTERLY,
+    "Yearly": PaymentFrequency.YEARLY,
+}
+_ENUM_TO_UI = {v: k for k, v in _UI_TO_ENUM.items()}
+
 
 class ExtraPaymentsView(QWidget):
     """View for configuring extra payments and analyzing their impact."""
 
     impact_changed = Signal(dict)
 
-    def __init__(self):
+    def __init__(self, session=None):
         super().__init__()
+        self.session = session or get_session()
+        self.repo = ExtraPaymentRepository(self.session)
         self.loan_data = None
         self.extra_payments = []
         self._init_ui()
@@ -119,16 +132,30 @@ class ExtraPaymentsView(QWidget):
         main_layout.addWidget(note)
 
     def set_loan_data(self, loan: dict):
-        """Set the active loan and reset configured extra payments."""
+        """Set the active loan and reload its persisted extra payments."""
         self.loan_data = loan
         self.extra_payments = []
-        self._refresh_table()
-        self._clear_impact()
 
         if loan:
             self.loan_name_label.setText(f"{loan.get('name', 'Unnamed Loan')} - {loan.get('bank_name', '')}")
+            if loan.get("id") is not None:
+                self.extra_payments = [
+                    {
+                        "id": record.id,
+                        "amount": record.amount,
+                        "frequency": _ENUM_TO_UI.get(record.frequency, "One-Time"),
+                        "start_date": record.start_date,
+                    }
+                    for record in self.repo.get_by_loan(loan["id"])
+                ]
         else:
             self.loan_name_label.setText("No Loan Selected")
+
+        self._refresh_table()
+        if self.extra_payments:
+            self._calculate_impact()
+        else:
+            self._clear_impact()
 
     def _add_extra_payment(self):
         """Add a new extra payment configuration and recalculate impact."""
@@ -163,6 +190,14 @@ class ExtraPaymentsView(QWidget):
             return
 
         payment = {"amount": amount, "frequency": frequency, "start_date": start_date}
+        if self.loan_data.get("id") is not None:
+            record = self.repo.create(
+                loan_id=self.loan_data["id"],
+                amount=amount,
+                frequency=_UI_TO_ENUM[frequency],
+                start_date=start_date,
+            )
+            payment["id"] = record.id
         self.extra_payments.append(payment)
         self._refresh_table()
         self._calculate_impact()
@@ -183,7 +218,9 @@ class ExtraPaymentsView(QWidget):
     def _remove_extra_payment(self, row: int):
         """Remove a configured extra payment."""
         if 0 <= row < len(self.extra_payments):
-            self.extra_payments.pop(row)
+            payment = self.extra_payments.pop(row)
+            if payment.get("id") is not None:
+                self.repo.delete(payment["id"])
         self._refresh_table()
 
         if self.extra_payments:

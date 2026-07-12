@@ -10,6 +10,7 @@ from src.ui.amortization import AmortizationView
 from src.ui.extra_payments import ExtraPaymentsView
 from src.ui.simulator import WhatIfSimulator
 from src.calculations import AmortizationEngine
+from src.database import get_session
 from src.utils.helpers import to_datetime
 import traceback
 
@@ -33,11 +34,14 @@ class MainWindow(QMainWindow):
         self.tabs = QTabWidget()
         layout.addWidget(self.tabs)
 
+        # One database session shared by all persistent views
+        self.db_session = get_session()
+
         # Initialize modules
         self.dashboard = Dashboard()
-        self.loan_management = LoanManagement()
+        self.loan_management = LoanManagement(session=self.db_session)
         self.amortization_view = AmortizationView()
-        self.extra_payments_view = ExtraPaymentsView()
+        self.extra_payments_view = ExtraPaymentsView(session=self.db_session)
         self.simulator_view = WhatIfSimulator()
 
         # Track the most recent amortization schedule and extra-payment
@@ -55,6 +59,10 @@ class MainWindow(QMainWindow):
         # Status bar
         self.statusbar = self.statusBar()
         self.statusbar.showMessage("Ready")
+
+        # If loans were loaded from the database, show the first one
+        if self.loan_management.loans:
+            self.loan_management.loans_table.selectRow(0)
 
     def _create_tabs(self):
         """Create tabs for each module."""

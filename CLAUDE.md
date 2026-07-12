@@ -40,10 +40,13 @@ pytest tests/ -v
 - **ExtraPaymentEngine**: Analyze prepayment impact (tenure reduction, interest savings)
 - **LoanSimulator**: What-if scenarios (rate changes, tenure changes, extra payments)
 
-### Database
-- SQLite at `~/.loan_manager/loans.db`
+### Database ✅ (wired into UI)
+- SQLite at `~/.loan_manager/loans.db` (override location with `LOAN_MANAGER_DATA_DIR` env var)
 - Automatic initialization on app startup
 - Repository pattern for type-safe data access
+- Loans persist via `LoanRepository` (add/edit/delete in Loan Management tab)
+- Extra-payment plans persist per loan via `ExtraPaymentRepository` and reload on loan selection
+- One shared session created in `MainWindow`, passed to persistent views
 
 ### UI Modules
 1. ✅ **Dashboard** - KPIs, balance chart, payment distribution
@@ -124,9 +127,11 @@ Builds a standalone `Housing Loan Manager.app` (no Python required to run it) vi
 
 ## Next Priority Tasks
 
-1. **Amortization Viewer** - Table display of payment schedule
-2. **Extra Payments Module** - Configure prepayments (monthly/quarterly/yearly)
-3. **What-If Simulator UI** - Run and compare scenarios
-4. **Database Integration** - Persist loans to SQLite
-5. **Excel Export** - Export schedules from UI
+1. ~~Amortization Viewer~~ ✅ Done
+2. ~~Extra Payments Module~~ ✅ Done
+3. ~~What-If Simulator UI~~ ✅ Done
+4. ~~Database Integration~~ ✅ Done (loans + extra payments persist and reload)
+5. ~~Excel Export~~ ✅ Done (from Amortization tab)
 6. **PDF Reports** - Generate comprehensive reports
+7. **Reporting Tab** - Currently a placeholder
+8. **Multi-loan portfolio view**
