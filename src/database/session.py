@@ -3,13 +3,8 @@
 from contextlib import contextmanager
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker, Session
-from pathlib import Path
 from src.models.base import Base
-
-# Database file location
-DB_DIR = Path.home() / ".loan_manager"
-DB_DIR.mkdir(exist_ok=True)
-DATABASE_URL = f"sqlite:///{DB_DIR}/loans.db"
+from src.config import DATABASE_URL  # single source of truth for DB location
 
 # Create engine
 engine = create_engine(

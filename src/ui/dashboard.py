@@ -75,12 +75,10 @@ class InterestChartWidget(QWidget):
         """Update bar chart with principal and interest totals."""
         self.plot_widget.clear()
 
-        categories = ['Principal', 'Interest']
         values = [principal_total, interest_total]
         colors = [pg.mkColor('#4CAF50'), pg.mkColor('#FF9800')]
 
-        x = np.arange(len(categories))
-        bar_graph = pg.BarGraphItem(x=x, height=values, width=0.6, brushes=colors)
+        bar_graph = pg.BarGraphItem(x=[0, 1], height=values, width=0.6, brushes=colors)
         self.plot_widget.addItem(bar_graph)
 
         # Set x-axis labels
@@ -93,8 +91,6 @@ class Dashboard(QWidget):
 
     def __init__(self):
         super().__init__()
-        self.loan_data = None
-        self.amortization_data = None
         self._init_ui()
 
     def _init_ui(self):
@@ -147,10 +143,10 @@ class Dashboard(QWidget):
         layout.setSpacing(16)
 
         # KPI Cards
-        self.outstanding_balance_card = KPICard("Outstanding Balance", "₹0.00", color="#FF6B6B")
-        self.total_interest_paid_card = KPICard("Total Interest Paid", "₹0.00", color="#4ECDC4")
-        self.interest_saved_card = KPICard("Interest Saved", "₹0.00", color="#45B7D1")
-        self.closure_date_card = KPICard("Projected Closure", "--/--/----", color="#96CEB4")
+        self.outstanding_balance_card = StatCard("Outstanding Balance", color="#FF6B6B", value_point_size=24)
+        self.total_interest_paid_card = StatCard("Total Interest Paid", color="#4ECDC4", value_point_size=24)
+        self.interest_saved_card = StatCard("Interest Saved", color="#45B7D1", value_point_size=24)
+        self.closure_date_card = StatCard("Projected Closure", color="#96CEB4", value_point_size=24)
 
         layout.addWidget(self.outstanding_balance_card, 0, 0)
         layout.addWidget(self.total_interest_paid_card, 0, 1)
@@ -177,9 +173,6 @@ class Dashboard(QWidget):
 
     def set_loan_data(self, loan: dict, amortization: list, extra_payments_impact: dict = None):
         """Set loan data and update dashboard display."""
-        self.loan_data = loan
-        self.amortization_data = amortization
-
         if not loan or not amortization:
             self._clear_dashboard()
             return
@@ -191,10 +184,12 @@ class Dashboard(QWidget):
         principal_total = loan.get('principal_amount', 0)
         total_interest = sum(entry.get('interest', 0) for entry in amortization)
 
-        # Figure out how many EMIs have actually elapsed since the loan
-        # started, so "outstanding" and "interest paid" reflect today, not
-        # the schedule's final (near-zero) balance.
-        elapsed = self._elapsed_payments(loan, len(amortization))
+        # EMIs elapsed = schedule entries whose due date has passed. Counting
+        # from the schedule itself (rather than re-deriving month arithmetic)
+        # keeps this KPI consistent with the dates the Amortization tab shows.
+        today = datetime.now()
+        elapsed = sum(1 for entry in amortization
+                      if to_datetime(entry.get('due_date'), default=today) <= today)
 
         if elapsed > 0:
             outstanding = amortization[elapsed - 1].get('ending_balance', 0)
@@ -203,45 +198,24 @@ class Dashboard(QWidget):
             outstanding = principal_total
             total_interest_paid = 0
 
-        # Projected final closure date (end of the full schedule)
-        closure_date = amortization[-1].get('due_date')
-
-        # Interest saved (from extra payments)
+        # Projected closure: with prepayments configured, use the recalculated
+        # closure date so this KPI agrees with the Interest Saved card;
+        # otherwise the full schedule's final due date.
         interest_saved = 0
+        closure_date = amortization[-1].get('due_date')
         if extra_payments_impact:
             interest_saved = extra_payments_impact.get('interest_saved', 0)
+            closure_date = extra_payments_impact.get('new_closure_date', closure_date)
 
         # Update KPI cards
-        self.outstanding_balance_card.set_value(f"₹{outstanding:,.2f}")
-        self.total_interest_paid_card.set_value(f"₹{total_interest_paid:,.2f}")
-        self.interest_saved_card.set_value(f"₹{interest_saved:,.2f}")
-
-        # Format closure date
-        if closure_date:
-            if isinstance(closure_date, str):
-                closure_date_str = closure_date
-            else:
-                closure_date_str = closure_date.strftime("%d-%m-%Y")
-        else:
-            closure_date_str = "--/--/----"
-        self.closure_date_card.set_value(closure_date_str)
+        self.outstanding_balance_card.set_value(format_currency(outstanding))
+        self.total_interest_paid_card.set_value(format_currency(total_interest_paid))
+        self.interest_saved_card.set_value(format_currency(interest_saved))
+        self.closure_date_card.set_value(format_date(closure_date) if closure_date else "--/--/----")
 
         # Update charts
         self.balance_chart.update_chart(amortization)
         self.interest_chart.update_chart(principal_total, total_interest)
-
-    @staticmethod
-    def _elapsed_payments(loan: dict, tenure_months: int) -> int:
-        """Number of EMIs due between the loan's start date and today, clamped
-        to the schedule length."""
-        start_date = to_datetime(loan.get('start_date'))
-
-        today = datetime.now()
-        elapsed = (today.year - start_date.year) * 12 + (today.month - start_date.month)
-        if today.day < start_date.day:
-            elapsed -= 1
-
-        return max(0, min(elapsed, tenure_months))
 
     def _clear_dashboard(self):
         """Clear dashboard when no loan is selected."""

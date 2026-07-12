@@ -119,7 +119,7 @@ jb_loan_management/
 │   └── [QUICKSTART.md](QUICKSTART.md)                 (Setup guide)
 │
 ├── run.py                             (Simple launcher)
-├── test_demo.py                       (Demo script)
+├── demo.py                       (Demo script)
 ├── requirements.txt                   (Dependencies)
 └── CLAUDE.md                          (Dev reference)
 ```
@@ -174,7 +174,7 @@ python run.py
 
 ## 📈 Demo Results
 
-From test_demo.py, a ₹25 Lakh loan:
+From demo.py, a ₹25 Lakh loan:
 - **EMI**: ₹20,139.83
 - **Total Interest**: ₹23,35,559
 - **Total Payable**: ₹48,35,559

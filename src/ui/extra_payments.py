@@ -1,16 +1,18 @@
 """Extra payments module for configuring and analyzing prepayments."""
 
-from datetime import datetime
+from dateutil.relativedelta import relativedelta
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
-    QLabel, QPushButton, QLineEdit, QDoubleSpinBox, QComboBox,
+    QWidget, QVBoxLayout, QGridLayout,
+    QLabel, QPushButton, QDoubleSpinBox, QComboBox,
     QDateEdit, QTableWidget, QTableWidgetItem, QHeaderView,
-    QMessageBox, QFrame
+    QMessageBox
 )
-from PySide6.QtCore import Qt, QDate, Signal
+from PySide6.QtCore import QDate, Signal
 from PySide6.QtGui import QFont
 from src.calculations.extra_payment_engine import ExtraPaymentEngine
-from src.utils.helpers import to_datetime
+from src.ui.widgets import StatCard
+from src.utils.helpers import to_datetime, format_currency, format_date
+from src.utils.validators import validate_amount
 
 FREQUENCY_INTERVALS = {
     "One-Time": None,
@@ -18,43 +20,6 @@ FREQUENCY_INTERVALS = {
     "Quarterly": 3,
     "Yearly": 12,
 }
-
-
-class ImpactCard(QFrame):
-    """Small stat card for displaying prepayment impact metrics."""
-
-    def __init__(self, title: str, color: str = "#366092"):
-        super().__init__()
-        self.setStyleSheet("""
-            QFrame {
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                background-color: #f9f9f9;
-            }
-        """)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(4)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet("color: #666;")
-        title_font = QFont()
-        title_font.setPointSize(9)
-        title_label.setFont(title_font)
-
-        self.value_label = QLabel("--")
-        value_font = QFont()
-        value_font.setPointSize(16)
-        value_font.setBold(True)
-        self.value_label.setFont(value_font)
-        self.value_label.setStyleSheet(f"color: {color};")
-
-        layout.addWidget(title_label)
-        layout.addWidget(self.value_label)
-
-    def set_value(self, value: str):
-        """Update the displayed value."""
-        self.value_label.setText(value)
 
 
 class ExtraPaymentsView(QWidget):
@@ -133,10 +98,10 @@ class ExtraPaymentsView(QWidget):
 
         impact_layout = QGridLayout()
         impact_layout.setSpacing(16)
-        self.new_tenure_card = ImpactCard("New Tenure", color="#366092")
-        self.tenure_reduction_card = ImpactCard("Tenure Reduction", color="#4CAF50")
-        self.interest_saved_card = ImpactCard("Interest Saved", color="#FF9800")
-        self.new_closure_date_card = ImpactCard("New Closure Date", color="#45B7D1")
+        self.new_tenure_card = StatCard("New Tenure", color="#366092")
+        self.tenure_reduction_card = StatCard("Tenure Reduction", color="#4CAF50")
+        self.interest_saved_card = StatCard("Interest Saved", color="#FF9800")
+        self.new_closure_date_card = StatCard("New Closure Date", color="#45B7D1")
 
         impact_layout.addWidget(self.new_tenure_card, 0, 0)
         impact_layout.addWidget(self.tenure_reduction_card, 0, 1)
@@ -172,13 +137,30 @@ class ExtraPaymentsView(QWidget):
             return
 
         amount = self.amount_input.value()
-        if amount <= 0:
+        if not validate_amount(amount):
             QMessageBox.warning(self, "Validation Error", "Extra payment amount must be greater than 0")
             return
 
         frequency = self.frequency_input.currentText()
-        start_date = self.start_date_input.date().toPython()
-        start_date = datetime(start_date.year, start_date.month, start_date.day)
+        start_date = to_datetime(self.start_date_input.date().toPython())
+
+        # The payment must fall within the loan's life: applying it before
+        # the start would fake savings, and after the final EMI it can never
+        # be paid.
+        loan_start = to_datetime(self.loan_data.get("start_date"))
+        loan_end = loan_start + relativedelta(months=self.loan_data.get("tenure_months", 0))
+        if start_date < loan_start.replace(day=1):
+            QMessageBox.warning(
+                self, "Validation Error",
+                f"Extra payment date must be on or after the loan start ({format_date(loan_start)})"
+            )
+            return
+        if start_date > loan_end:
+            QMessageBox.warning(
+                self, "Validation Error",
+                f"Extra payment date is after the loan's final EMI ({format_date(loan_end)})"
+            )
+            return
 
         payment = {"amount": amount, "frequency": frequency, "start_date": start_date}
         self.extra_payments.append(payment)
@@ -190,9 +172,9 @@ class ExtraPaymentsView(QWidget):
         self.payments_table.setRowCount(0)
         for row, payment in enumerate(self.extra_payments):
             self.payments_table.insertRow(row)
-            self.payments_table.setItem(row, 0, QTableWidgetItem(f"₹{payment['amount']:,.2f}"))
+            self.payments_table.setItem(row, 0, QTableWidgetItem(format_currency(payment["amount"])))
             self.payments_table.setItem(row, 1, QTableWidgetItem(payment["frequency"]))
-            self.payments_table.setItem(row, 2, QTableWidgetItem(payment["start_date"].strftime("%d-%m-%Y")))
+            self.payments_table.setItem(row, 2, QTableWidgetItem(format_date(payment["start_date"])))
 
             remove_btn = QPushButton("Remove")
             remove_btn.clicked.connect(lambda checked=False, r=row: self._remove_extra_payment(r))
@@ -235,8 +217,8 @@ class ExtraPaymentsView(QWidget):
 
             self.new_tenure_card.set_value(f"{analysis.new_tenure_months} months")
             self.tenure_reduction_card.set_value(f"{analysis.months_saved} months")
-            self.interest_saved_card.set_value(f"₹{analysis.interest_saved:,.2f}")
-            self.new_closure_date_card.set_value(analysis.new_closure_date.strftime("%d-%m-%Y"))
+            self.interest_saved_card.set_value(format_currency(analysis.interest_saved))
+            self.new_closure_date_card.set_value(format_date(analysis.new_closure_date))
 
             self.impact_changed.emit(analysis.to_dict())
         except Exception as e:

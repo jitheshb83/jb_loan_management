@@ -77,3 +77,33 @@ class TestExtraPaymentEngine:
         baseline_interest = EMICalculator.calculate_total_interest(self.PRINCIPAL, self.RATE, self.TENURE)
         assert abs(result.new_total_interest - baseline_interest) < 1
         assert result.new_tenure_months == self.TENURE
+
+    def test_baseline_never_negative_across_rates(self):
+        """Regression: with the rounded EMI the baseline simulation could run
+        one month past tenure (months_saved = -1) at rates like 9.37%. The
+        simulation must use the exact EMI so the baseline closes on time."""
+        for rate in (6.9, 7.1, 8.13, 9.37, 11.01, 12.5):
+            result = ExtraPaymentEngine.calculate_with_multiple_extra_payments(
+                self.PRINCIPAL, rate, self.TENURE, self.START, []
+            )
+            assert result.months_saved == 0, f"rate {rate}: months_saved {result.months_saved}"
+            assert abs(result.interest_saved) < 1, f"rate {rate}: interest_saved {result.interest_saved}"
+
+    def test_payment_before_loan_start_rejected(self):
+        """Regression: a plan dated before the loan start used to be silently
+        clamped to month 1, overstating savings. It must raise instead."""
+        import pytest
+        with pytest.raises(ValueError):
+            ExtraPaymentEngine.calculate_with_multiple_extra_payments(
+                self.PRINCIPAL, self.RATE, self.TENURE, self.START,
+                [{"amount": 100000, "interval_months": None,
+                  "start_date": datetime(2020, 1, 1)}],
+            )
+
+    def test_closure_date_uses_calendar_months(self):
+        """Regression: closure dates used +30*n days, drifting ~5 days/year
+        from the schedule's real due dates."""
+        result = ExtraPaymentEngine.calculate_with_multiple_extra_payments(
+            self.PRINCIPAL, self.RATE, self.TENURE, self.START, []
+        )
+        assert result.new_closure_date == datetime(2044, 1, 1)

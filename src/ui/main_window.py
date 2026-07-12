@@ -1,8 +1,7 @@
 """Main application window."""
 
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout, QTabWidget,
-    QPushButton, QLabel, QStatusBar
+    QMainWindow, QWidget, QVBoxLayout, QTabWidget, QLabel
 )
 from PySide6.QtCore import Qt
 from src.ui.dashboard import Dashboard
@@ -12,7 +11,7 @@ from src.ui.extra_payments import ExtraPaymentsView
 from src.ui.simulator import WhatIfSimulator
 from src.calculations import AmortizationEngine
 from src.utils.helpers import to_datetime
-from datetime import datetime
+import traceback
 
 
 class MainWindow(QMainWindow):
@@ -118,6 +117,9 @@ class MainWindow(QMainWindow):
 
             self.statusbar.showMessage(f"Loan selected: {loan_data.get('name', 'Unknown')}")
         except Exception as e:
+            # Surface the full traceback for debugging — a status-bar string
+            # alone has already hidden a real rendering bug once.
+            traceback.print_exc()
             self.statusbar.showMessage(f"Error loading loan: {str(e)}")
 
     def _on_extra_payment_impact_changed(self, impact: dict):

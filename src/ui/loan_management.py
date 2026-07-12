@@ -4,11 +4,10 @@ from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QLineEdit, QSpinBox, QDoubleSpinBox,
     QDateEdit, QTableWidget, QTableWidgetItem, QDialog,
-    QMessageBox, QSplitter, QHeaderView
+    QMessageBox, QHeaderView
 )
-from PySide6.QtCore import Qt, QDate, Signal
+from PySide6.QtCore import QDate, Signal
 from PySide6.QtGui import QFont
-from datetime import datetime
 from src.calculations import EMICalculator
 from src.utils.helpers import to_datetime, format_currency
 from src.utils.validators import validate_loan_input, ValidationError

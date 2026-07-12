@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from PySide6.QtWidgets import (
-    QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
+    QWidget, QVBoxLayout, QGridLayout,
     QLabel, QPushButton, QDoubleSpinBox, QSpinBox,
     QDateEdit, QTableWidget, QTableWidgetItem, QHeaderView,
     QTabWidget, QMessageBox
@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 from PySide6.QtCore import Qt, QDate
 from PySide6.QtGui import QFont
 from src.calculations import LoanSimulator
-from src.utils.helpers import to_datetime
+from src.utils.helpers import to_datetime, format_currency, format_date
 
 
 class RateChangeForm(QWidget):
@@ -194,7 +194,7 @@ class WhatIfSimulator(QWidget):
                     principal, rate, tenure, start_date,
                     params["new_rate"], params["rate_change_date"]
                 )
-                details = f"Rate → {params['new_rate']}% from {params['rate_change_date'].strftime('%d-%m-%Y')}"
+                details = f"Rate → {params['new_rate']}% from {format_date(params['rate_change_date'])}"
                 row = {
                     "scenario": "Rate Change",
                     "details": details,
@@ -223,7 +223,7 @@ class WhatIfSimulator(QWidget):
                     principal, rate, tenure, start_date,
                     params["extra_payment"], params["extra_payment_date"]
                 )
-                details = f"₹{params['extra_payment']:,.0f} on {params['extra_payment_date'].strftime('%d-%m-%Y')}"
+                details = f"{format_currency(params['extra_payment'])} on {format_date(params['extra_payment_date'])}"
                 row = {
                     "scenario": "Extra Payment",
                     "details": details,
@@ -247,11 +247,11 @@ class WhatIfSimulator(QWidget):
         for row_idx, row in enumerate(self.results):
             self.comparison_table.insertRow(row_idx)
 
-            emi_str = f"₹{row['new_emi']:,.2f}" if row["new_emi"] is not None else "—"
-            interest_str = f"₹{row['new_total_interest']:,.2f}"
+            emi_str = format_currency(row["new_emi"]) if row["new_emi"] is not None else "—"
+            interest_str = format_currency(row["new_total_interest"])
 
             impact = row["interest_impact"]
-            impact_str = f"{'+' if impact >= 0 else ''}₹{impact:,.2f}"
+            impact_str = ("+" if impact >= 0 else "-") + format_currency(abs(impact))
 
             values = [row["scenario"], row["details"], emi_str, interest_str, impact_str, row["tenure_impact"]]
             for col, value in enumerate(values):

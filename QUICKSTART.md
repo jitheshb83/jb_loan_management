@@ -52,7 +52,7 @@ pytest tests/ -v
 pytest tests/test_emi_calculator.py -v
 
 # Run demo
-python test_demo.py
+python demo.py
 ```
 
 ## Project Structure

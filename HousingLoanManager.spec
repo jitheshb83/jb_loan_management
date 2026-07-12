@@ -5,15 +5,12 @@ from PyInstaller.utils.hooks import collect_all
 
 block_cipher = None
 
-datas = []
-binaries = []
-hiddenimports = []
-
-for pkg in ("pyqtgraph", "PySide6"):
-    pkg_datas, pkg_binaries, pkg_hiddenimports = collect_all(pkg)
-    datas += pkg_datas
-    binaries += pkg_binaries
-    hiddenimports += pkg_hiddenimports
+# Only pyqtgraph needs collect_all (its colormaps/icons are data files that
+# import-analysis misses). PySide6 is handled by PyInstaller's own hooks,
+# which follow actual imports — collect_all("PySide6") would bundle every Qt
+# module (WebEngine's Chromium, Quick3D, Multimedia, ...) and triple the app
+# size for a plain QtWidgets app.
+datas, binaries, hiddenimports = collect_all("pyqtgraph")
 
 a = Analysis(
     ["run.py"],
@@ -24,7 +21,27 @@ a = Analysis(
     hookspath=[],
     hooksconfig={},
     runtime_hooks=[],
-    excludes=[],
+    excludes=[
+        "PySide6.QtWebEngineCore",
+        "PySide6.QtWebEngineWidgets",
+        "PySide6.QtQuick",
+        "PySide6.QtQuick3D",
+        "PySide6.QtQml",
+        "PySide6.QtMultimedia",
+        "PySide6.QtCharts",
+        "PySide6.QtDataVisualization",
+        "PySide6.Qt3DCore",
+        "PySide6.Qt3DRender",
+        "PySide6.QtPdf",
+        "PySide6.QtWebChannel",
+        "PySide6.QtNetworkAuth",
+        "PySide6.QtRemoteObjects",
+        "PySide6.QtSensors",
+        "PySide6.QtSerialPort",
+        "PySide6.QtBluetooth",
+        "PySide6.QtPositioning",
+        "PySide6.QtLocation",
+    ],
     noarchive=False,
     cipher=block_cipher,
 )

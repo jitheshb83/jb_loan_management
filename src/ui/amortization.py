@@ -3,49 +3,13 @@
 from PySide6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QGridLayout,
     QLabel, QPushButton, QTableWidget, QTableWidgetItem,
-    QHeaderView, QFileDialog, QMessageBox, QFrame
+    QHeaderView, QFileDialog, QMessageBox
 )
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QFont
-from src.calculations import AmortizationEngine
 from src.reporting import ExcelExporter
-
-
-class SummaryCard(QFrame):
-    """Small summary stat card used at the top of the amortization view."""
-
-    def __init__(self, title: str, color: str = "#366092"):
-        super().__init__()
-        self.setStyleSheet("""
-            QFrame {
-                border: 1px solid #ddd;
-                border-radius: 8px;
-                background-color: #f9f9f9;
-            }
-        """)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(16, 12, 16, 12)
-        layout.setSpacing(4)
-
-        title_label = QLabel(title)
-        title_label.setStyleSheet("color: #666;")
-        title_font = QFont()
-        title_font.setPointSize(9)
-        title_label.setFont(title_font)
-
-        self.value_label = QLabel("--")
-        value_font = QFont()
-        value_font.setPointSize(16)
-        value_font.setBold(True)
-        self.value_label.setFont(value_font)
-        self.value_label.setStyleSheet(f"color: {color};")
-
-        layout.addWidget(title_label)
-        layout.addWidget(self.value_label)
-
-    def set_value(self, value: str):
-        """Update the displayed value."""
-        self.value_label.setText(value)
+from src.ui.widgets import StatCard
+from src.utils.helpers import format_currency, format_date
 
 
 class AmortizationView(QWidget):
@@ -80,10 +44,10 @@ class AmortizationView(QWidget):
         # Summary cards
         summary_layout = QGridLayout()
         summary_layout.setSpacing(16)
-        self.total_payments_card = SummaryCard("Total Payments", color="#366092")
-        self.total_principal_card = SummaryCard("Total Principal", color="#4CAF50")
-        self.total_interest_card = SummaryCard("Total Interest", color="#FF9800")
-        self.total_amount_card = SummaryCard("Total Amount Payable", color="#FF6B6B")
+        self.total_payments_card = StatCard("Total Payments", color="#366092")
+        self.total_principal_card = StatCard("Total Principal", color="#4CAF50")
+        self.total_interest_card = StatCard("Total Interest", color="#FF9800")
+        self.total_amount_card = StatCard("Total Amount Payable", color="#FF6B6B")
 
         summary_layout.addWidget(self.total_payments_card, 0, 0)
         summary_layout.addWidget(self.total_principal_card, 0, 1)
@@ -121,14 +85,13 @@ class AmortizationView(QWidget):
 
         self.loan_name_label.setText(f"{loan.get('name', 'Unnamed Loan')} - {loan.get('bank_name', '')}")
 
-        summary = AmortizationEngine.get_summary(
-            [_DictEntryAdapter(entry) for entry in amortization]
-        )
+        total_principal = sum(entry.get("principal", 0) for entry in amortization)
+        total_interest = sum(entry.get("interest", 0) for entry in amortization)
 
-        self.total_payments_card.set_value(str(summary.get("total_payments", 0)))
-        self.total_principal_card.set_value(f"₹{summary.get('total_principal', 0):,.2f}")
-        self.total_interest_card.set_value(f"₹{summary.get('total_interest', 0):,.2f}")
-        self.total_amount_card.set_value(f"₹{summary.get('total_amount', 0):,.2f}")
+        self.total_payments_card.set_value(str(len(amortization)))
+        self.total_principal_card.set_value(format_currency(total_principal))
+        self.total_interest_card.set_value(format_currency(total_interest))
+        self.total_amount_card.set_value(format_currency(total_principal + total_interest))
 
         self._populate_table(amortization)
 
@@ -138,17 +101,14 @@ class AmortizationView(QWidget):
         self.schedule_table.setRowCount(len(amortization))
 
         for row, entry in enumerate(amortization):
-            due_date = entry.get("due_date")
-            due_date_str = due_date.strftime("%d-%m-%Y") if hasattr(due_date, "strftime") else str(due_date)
-
             values = [
                 str(entry.get("payment_number", "")),
-                due_date_str,
-                f"₹{entry.get('beginning_balance', 0):,.2f}",
-                f"₹{entry.get('emi', 0):,.2f}",
-                f"₹{entry.get('principal', 0):,.2f}",
-                f"₹{entry.get('interest', 0):,.2f}",
-                f"₹{entry.get('ending_balance', 0):,.2f}",
+                format_date(entry.get("due_date")),
+                format_currency(entry.get("beginning_balance", 0)),
+                format_currency(entry.get("emi", 0)),
+                format_currency(entry.get("principal", 0)),
+                format_currency(entry.get("interest", 0)),
+                format_currency(entry.get("ending_balance", 0)),
             ]
             for col, value in enumerate(values):
                 item = QTableWidgetItem(value)
@@ -192,13 +152,3 @@ class AmortizationView(QWidget):
         ]:
             card.set_value("--")
         self.schedule_table.setRowCount(0)
-
-
-class _DictEntryAdapter:
-    """Adapts a schedule dict to look like an AmortizationEntry for get_summary()."""
-
-    def __init__(self, entry: dict):
-        self.interest = entry.get("interest", 0)
-        self.principal = entry.get("principal", 0)
-        self.emi = entry.get("emi", 0)
-        self.due_date = entry.get("due_date")
