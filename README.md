@@ -2,7 +2,7 @@
 
 Desktop application built with Python and PySide6 for housing loan management, amortization analysis, prepayment optimization and reporting.
 
-![Platform](https://img.shields.io/badge/platform-macOS-blue) ![Python](https://img.shields.io/badge/python-3.10%2B-green) ![UI](https://img.shields.io/badge/UI-PySide6%20(Qt)-brightgreen)
+![Platform](https://img.shields.io/badge/platform-macOS-blue) ![Python](https://img.shields.io/badge/python-3.10%2B-green) ![UI](https://img.shields.io/badge/UI-PySide6%20(Qt)-brightgreen) ![License](https://img.shields.io/badge/license-MIT-yellow)
 
 ## Features
 
@@ -150,3 +150,20 @@ Set `LOAN_MANAGER_DATA_DIR=/some/path` to relocate the database (useful for test
 - Single-loan workflows; multi-loan portfolio view planned
 
 See [CLAUDE.md](CLAUDE.md) and [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for development details.
+
+## License
+
+This project is licensed under the [MIT License](LICENSE) — free to use, modify, and distribute, for personal or commercial purposes. See the [LICENSE](LICENSE) file for the full text.
+
+> **Note on bundled dependencies:** the packaged app includes PySide6 (Qt for Python), which is licensed under LGPL-3.0. Dynamic linking as done here is fine for MIT-licensed projects; if you ever modify Qt itself, those modifications fall under LGPL terms.
+
+## Disclaimer
+
+This software is provided **"as is", without warranty of any kind**, and is offered free of charge in the hope that it is useful.
+
+- The author is **not responsible for any bugs, errors, malfunctions, data loss, or issues of any kind** arising from the use of this software.
+- Calculations (EMI, amortization, interest savings, projections) are **for informational purposes only** and may differ from your bank's actual figures due to rounding conventions, fees, compounding methods, or rate changes. **This is not financial advice.**
+- Always verify numbers with your lender before making financial decisions (prepayments, refinancing, etc.).
+- You use this software entirely **at your own risk**.
+
+See the [LICENSE](LICENSE) file for the full legal warranty disclaimer.
